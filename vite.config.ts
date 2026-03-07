@@ -21,7 +21,7 @@ export default defineConfig(({mode}) => {
           description: 'Una pizarra interactiva avanzada con zoom y lupa de precisión',
           theme_color: '#6366f1',
           background_color: '#ffffff',
-          display: 'standalone',
+          display: 'fullscreen',
           orientation: 'any',
           scope: './',
           start_url: './',

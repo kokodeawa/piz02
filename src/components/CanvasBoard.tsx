@@ -206,6 +206,19 @@ export const CanvasBoard = React.memo(function CanvasBoard({
 
     const pos = getPointerPos(e);
 
+    if (tool === 'eraser') {
+      const eraserRadius = eraserSize / 2;
+      setStrokes(prev => prev.filter(stroke => {
+        return !stroke.points.some(p => {
+          const dx = p[0] - pos.x;
+          const dy = p[1] - pos.y;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      }));
+      setIsDrawing(true); // Still set drawing to true to allow move erasing
+      return;
+    }
+
     if (tool === 'pan') {
       setIsPanning(true);
       setLastPan({ x: e.clientX, y: e.clientY });
@@ -228,7 +241,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
     setIsDrawing(true);
     onStrokeStart();
     const points: Point[] = [[pos.x, pos.y, pos.pressure]];
-    const strokeSize = tool === 'laser' ? laserSize : (tool === 'eraser' ? eraserSize : size);
+    const strokeSize = tool === 'laser' ? laserSize : size;
     const options = {
       size: strokeSize,
       thinning: 0.5,
@@ -260,6 +273,19 @@ export const CanvasBoard = React.memo(function CanvasBoard({
     }
 
     const pos = getPointerPos(e);
+
+    if (tool === 'eraser') {
+      const eraserRadius = eraserSize / 2;
+      setStrokes(prev => prev.filter(stroke => {
+        // Check if any point in the stroke is within eraser radius
+        return !stroke.points.some(p => {
+          const dx = p[0] - pos.x;
+          const dy = p[1] - pos.y;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      }));
+      return;
+    }
 
     if (isDraggingLupa) {
       setLupaPos(prev => ({

@@ -220,7 +220,7 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     let initialZoom: number = 1;
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2 && tool === 'pan') {
+      if (e.touches.length === 2) {
         e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -230,7 +230,7 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && initialPinchDistance && tool === 'pan') {
+      if (e.touches.length === 2 && initialPinchDistance) {
         e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -299,17 +299,31 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
       return;
     }
 
+    const pos = getPointerPos(e);
+
+    if (tool === 'eraser') {
+      const eraserRadius = eraserSize / 2;
+      setStrokes(prev => prev.filter(stroke => {
+        return !stroke.points.some(p => {
+          const dx = p[0] - pos.x;
+          const dy = p[1] - pos.y;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      }));
+      setIsDrawing(true);
+      return;
+    }
+
     if (tool === 'pan') {
       setIsPanning(true);
       setLastPan({ x: e.clientX, y: e.clientY });
       return;
     }
 
-    const pos = getPointerPos(e);
     setIsDrawing(true);
     onStrokeStart();
     const points: Point[] = [[pos.x, pos.y, pos.pressure]];
-    const strokeSize = tool === 'laser' ? laserSize : (tool === 'eraser' ? eraserSize : size);
+    const strokeSize = tool === 'laser' ? laserSize : size;
     const options = {
       size: strokeSize,
       thinning: 0.5,
@@ -331,6 +345,21 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
   const handlePointerMove = (e: React.PointerEvent) => {
     e.preventDefault();
     if (activePointers.current.size > 1) return;
+
+    const pos = getPointerPos(e);
+
+    if (tool === 'eraser') {
+      const eraserRadius = eraserSize / 2;
+      setStrokes(prev => prev.filter(stroke => {
+        // Check if any point in the stroke is within eraser radius
+        return !stroke.points.some(p => {
+          const dx = p[0] - pos.x;
+          const dy = p[1] - pos.y;
+          return Math.sqrt(dx * dx + dy * dy) < eraserRadius;
+        });
+      }));
+      return;
+    }
 
     if (isPanning && lastPan) {
       const dx = e.clientX - lastPan.x;
@@ -355,8 +384,6 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
 
     if (!isDrawing || !currentStrokeRef.current) return;
 
-    const pos = getPointerPos(e);
-    
     const prev = currentStrokeRef.current;
     const newPoints = [...prev.points, [pos.x, pos.y, pos.pressure] as Point];
     const options = {

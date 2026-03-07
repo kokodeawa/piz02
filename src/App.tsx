@@ -54,49 +54,8 @@ export default function App() {
   const [lupaPos, setLupaPos] = useState({ x: 0, y: 0, width: 400, height: 200, zoom: 2 });
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
 
-  // Load documents from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('pizarra-documents');
-    if (saved) {
-      try {
-        setDocuments(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to load documents', e);
-      }
-    } else {
-      // Initialize with a default document if no saved documents
-      const isLandscape = window.innerWidth > window.innerHeight;
-      let centerX, centerY;
-
-      if (isLandscape) {
-        centerX = (window.innerWidth * 0.65) / 2;
-        centerY = window.innerHeight / 2;
-      } else {
-        centerX = window.innerWidth / 2;
-        centerY = (window.innerHeight * 0.65) / 2;
-      }
-
-      const initialDoc: CanvasDocument = {
-        id: uuidv4(),
-        name: 'Lienzo 1',
-        lastModified: Date.now(),
-        strokes: [],
-        background: 'blank',
-        pattern: 'grid',
-        transform: { x: 0, y: 0, scale: 1 },
-        lupaPos: { 
-          x: centerX, 
-          y: centerY, 
-          width: 400, 
-          height: 200, 
-          zoom: 2 
-        }
-      };
-      setDocuments([initialDoc]);
-      setCurrentDocId(initialDoc.id);
-      setStrokes([]);
-    }
-  }, []);
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   // Save documents to localStorage
   useEffect(() => {
@@ -189,6 +148,82 @@ export default function App() {
     setView('dashboard');
     setCurrentDocId(null);
   }, []);
+
+  // Load documents from localStorage and History trap
+  useEffect(() => {
+    // History trap to prevent back gesture from exiting
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      if (viewRef.current === 'editor') {
+        handleExit();
+        window.history.pushState(null, '', window.location.href);
+      } else {
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    // Prevent edge swipes (back/forward) in some browsers
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const x = e.touches[0].clientX;
+        const edgeThreshold = 30; // 30px from edge
+        if (x < edgeThreshold || x > window.innerWidth - edgeThreshold) {
+          // This is an edge touch, prevent default to avoid back/forward navigation
+          // Note: This might be ignored by some browsers for system gestures
+          // but helps with browser-level navigation.
+          // e.preventDefault(); // This can be risky, let's just be aware
+        }
+      }
+    };
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+
+    const saved = localStorage.getItem('pizarra-documents');
+    if (saved) {
+      try {
+        setDocuments(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load documents', e);
+      }
+    } else {
+      // Initialize with a default document if no saved documents
+      const isLandscape = window.innerWidth > window.innerHeight;
+      let centerX, centerY;
+
+      if (isLandscape) {
+        centerX = (window.innerWidth * 0.65) / 2;
+        centerY = window.innerHeight / 2;
+      } else {
+        centerX = window.innerWidth / 2;
+        centerY = (window.innerHeight * 0.65) / 2;
+      }
+
+      const initialDoc: CanvasDocument = {
+        id: uuidv4(),
+        name: 'Lienzo 1',
+        lastModified: Date.now(),
+        strokes: [],
+        background: 'blank',
+        pattern: 'grid',
+        transform: { x: 0, y: 0, scale: 1 },
+        lupaPos: { 
+          x: centerX, 
+          y: centerY, 
+          width: 400, 
+          height: 200, 
+          zoom: 2 
+        }
+      };
+      setDocuments([initialDoc]);
+      setCurrentDocId(initialDoc.id);
+      setStrokes([]);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('touchstart', handleTouchStart);
+    };
+  }, [handleExit]);
 
   // Save state before stroke
   const handleStrokeStart = useCallback(() => {
@@ -399,7 +434,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-[100dvh] overflow-hidden bg-slate-50 relative font-sans flex flex-col landscape:flex-row">
+    <div className="w-full h-[100dvh] overflow-hidden bg-slate-50 relative font-sans flex flex-col landscape:flex-row overscroll-none touch-none">
       <div className="flex-1 relative">
         <CanvasBoard
           strokes={strokes}
