@@ -47,7 +47,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ documents, onSelect, onCre
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-12 font-sans">
+    <div className="min-h-[100dvh] bg-slate-50 p-6 md:p-12 font-sans">
       <div className="max-w-6xl mx-auto">
         <header className="flex justify-between items-center mb-12">
           <div>

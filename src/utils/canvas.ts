@@ -98,17 +98,44 @@ export function drawBackground(
   height: number,
   transform: { x: number; y: number; scale: number },
   type: string,
-  pattern: string = 'none'
+  pattern: string = 'none',
+  externalTime?: number
 ) {
-  const time = performance.now();
+  const time = externalTime ?? performance.now();
 
   // Base color
   switch (type) {
-    case 'dark': ctx.fillStyle = '#1e293b'; break;
+    case 'dark': {
+      // Gris Pizarra - Diagonal brushed metal
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#1e293b'); // Slate 800
+      gradient.addColorStop(0.4, '#334155'); // Slate 700
+      gradient.addColorStop(0.5, '#475569'); // Slate 600 (Highlight)
+      gradient.addColorStop(0.6, '#334155');
+      gradient.addColorStop(1, '#0f172a'); // Slate 900
+      ctx.fillStyle = gradient;
+      break;
+    }
     case 'pink': ctx.fillStyle = '#fdf2f8'; break;
     case 'yellow': ctx.fillStyle = '#fefce8'; break;
-    case 'lightgray': ctx.fillStyle = '#e2e8f0'; break;
-    case 'midgray': ctx.fillStyle = '#64748b'; break;
+    case 'lightgray': {
+      // Gris Claro - Polished aluminum
+      const gradient = ctx.createLinearGradient(0, height * 0.2, 0, height * 0.8);
+      gradient.addColorStop(0, '#f1f5f9'); // Slate 100
+      gradient.addColorStop(0.5, '#cbd5e1'); // Slate 300
+      gradient.addColorStop(1, '#94a3b8'); // Slate 400
+      ctx.fillStyle = gradient;
+      break;
+    }
+    case 'midgray': {
+      // Gris - Metallic spotlight
+      const gradient = ctx.createRadialGradient(width * 0.3, height * 0.3, 0, width * 0.5, height * 0.5, Math.max(width, height));
+      gradient.addColorStop(0, '#94a3b8'); // Slate 400
+      gradient.addColorStop(0.5, '#475569'); // Slate 600
+      gradient.addColorStop(1, '#1e293b'); // Slate 800
+      ctx.fillStyle = gradient;
+      break;
+    }
     case 'navy': {
       const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height));
       gradient.addColorStop(0, '#1e40af'); // Blue 800
@@ -126,12 +153,22 @@ export function drawBackground(
       break;
     }
     case 'black': ctx.fillStyle = '#000000'; break;
-    case 'gray': ctx.fillStyle = '#111827'; break;
+    case 'gray': {
+      // Gris Carbón - Deep metallic texture
+      const gradient = ctx.createLinearGradient(width, 0, 0, height);
+      gradient.addColorStop(0, '#111827'); // Gray 900
+      gradient.addColorStop(0.3, '#1f2937'); // Gray 800
+      gradient.addColorStop(0.5, '#374151'); // Gray 700 (Metallic sheen)
+      gradient.addColorStop(0.7, '#1f2937');
+      gradient.addColorStop(1, '#030712'); // Gray 950
+      ctx.fillStyle = gradient;
+      break;
+    }
     case 'universe': ctx.fillStyle = '#050505'; break;
     case 'mosaic': {
-      // Transition color over 20 seconds
-      const hue = (time / 20000 * 360) % 360;
-      ctx.fillStyle = `hsl(${hue}, 20%, 5%)`;
+      // Transition color slower (30s cycle)
+      const hue = (time / 30000 * 360) % 360;
+      ctx.fillStyle = `hsl(${hue}, 50%, 12%)`;
       break;
     }
     default: ctx.fillStyle = '#f8fafc';
@@ -175,9 +212,9 @@ export function drawBackground(
       for (let y = offsetY - mosaicSize; y < height + mosaicSize; y += mosaicSize) {
         const i = Math.floor((x - transform.x) / mosaicSize);
         const j = Math.floor((y - transform.y) / mosaicSize);
-        const hueOffset = (Math.sin(i * 0.5 + j * 0.3) * 30);
-        const hue = ((time / 20000 * 360) + hueOffset) % 360;
-        ctx.fillStyle = `hsl(${hue}, 30%, 8%)`;
+        const hueOffset = (Math.sin(i * 0.5 + j * 0.3) * 40);
+        const hue = ((time / 30000 * 360) + hueOffset) % 360;
+        ctx.fillStyle = `hsl(${hue}, 65%, 15%)`;
         ctx.fillRect(x + 1, y + 1, mosaicSize - 2, mosaicSize - 2);
       }
     }

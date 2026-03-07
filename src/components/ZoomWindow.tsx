@@ -56,6 +56,14 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
       if (onResize) onResize(width, height);
     });
     observer.observe(container);
+    
+    // Initial size
+    const rect = container.getBoundingClientRect();
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+    setWindowSize({ width: w, height: h });
+    if (onResize) onResize(w, h);
+
     return () => observer.disconnect();
   }, [onResize]);
 
@@ -93,39 +101,50 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
   useEffect(() => {
     const canvas = backgroundCanvasRef.current;
     if (!canvas || windowSize.width === 0) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== windowSize.width * dpr || canvas.height !== windowSize.height * dpr) {
-      canvas.width = windowSize.width * dpr;
-      canvas.height = windowSize.height * dpr;
-      ctx.scale(dpr, dpr);
-    }
+    let animationFrameId: number;
 
-    ctx.clearRect(0, 0, windowSize.width, windowSize.height);
+    const render = (time: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== windowSize.width * dpr || canvas.height !== windowSize.height * dpr) {
+        canvas.width = windowSize.width * dpr;
+        canvas.height = windowSize.height * dpr;
+        ctx.scale(dpr, dpr);
+      }
 
-    const targetWidth = displayLupaPos.width / displayLupaPos.zoom;
-    const targetHeight = displayLupaPos.height / displayLupaPos.zoom;
-    const scaleX = windowSize.width / targetWidth;
-    const scaleY = windowSize.height / targetHeight;
-    const scale = Math.min(scaleX, scaleY);
-    const offsetX = (windowSize.width - targetWidth * scale) / 2;
-    const offsetY = (windowSize.height - targetHeight * scale) / 2;
+      ctx.clearRect(0, 0, windowSize.width, windowSize.height);
 
-    const zoomTransform = {
-      x: offsetX + scale * (-displayLupaPos.x + (targetWidth/2)),
-      y: offsetY + scale * (-displayLupaPos.y + (targetHeight/2)),
-      scale: scale
+      const targetWidth = displayLupaPos.width / displayLupaPos.zoom;
+      const targetHeight = displayLupaPos.height / displayLupaPos.zoom;
+      const scaleX = windowSize.width / targetWidth;
+      const scaleY = windowSize.height / targetHeight;
+      const scale = Math.min(scaleX, scaleY);
+      const offsetX = (windowSize.width - targetWidth * scale) / 2;
+      const offsetY = (windowSize.height - targetHeight * scale) / 2;
+
+      const zoomTransform = {
+        x: offsetX + scale * (-displayLupaPos.x + (targetWidth/2)),
+        y: offsetY + scale * (-displayLupaPos.y + (targetHeight/2)),
+        scale: scale
+      };
+      drawBackground(ctx, windowSize.width, windowSize.height, zoomTransform, background, pattern, time);
+
+      if (background === 'universe' || background === 'mosaic') {
+        animationFrameId = requestAnimationFrame(render);
+      }
     };
-    drawBackground(ctx, windowSize.width, windowSize.height, zoomTransform, background, pattern);
+
+    animationFrameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [displayLupaPos, windowSize, background, pattern]);
 
   // Render loop (Strokes)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || windowSize.width === 0) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let animationFrameId: number;
@@ -440,11 +459,11 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
       <div ref={canvasContainerRef} className="flex-1 relative overflow-hidden">
         <canvas
           ref={backgroundCanvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
+          className="absolute inset-0 w-full h-full pointer-events-none bg-white"
         />
         <canvas
           ref={canvasRef}
-          className="block w-full h-full cursor-crosshair relative z-10"
+          className="block w-full h-full cursor-crosshair relative z-10 bg-transparent"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}

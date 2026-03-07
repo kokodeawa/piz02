@@ -30,6 +30,14 @@ export default function App() {
 
   const [boardSize, setBoardSize] = useState(getInitialBoardSize());
   const prevBoardSizeRef = useRef(boardSize);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setBoardSize(getInitialBoardSize());
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   const [tool, setTool] = useState<ToolType>('pen');
   const [color, setColor] = useState('#000000');
@@ -391,7 +399,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-slate-50 relative font-sans flex flex-col landscape:flex-row">
+    <div className="w-full h-[100dvh] overflow-hidden bg-slate-50 relative font-sans flex flex-col landscape:flex-row pb-[env(safe-area-inset-bottom)]">
       <div className="flex-1 relative">
         <CanvasBoard
           strokes={strokes}
@@ -452,7 +460,7 @@ export default function App() {
         />
       </div>
 
-      <div className="z-40 flex flex-col h-[35vh] landscape:h-full landscape:w-[35vw]">
+      <div className="z-40 flex flex-col h-[40dvh] landscape:h-full landscape:w-[35vw] border-t-4 landscape:border-t-0 landscape:border-l-4 border-indigo-500 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] landscape:shadow-[-10px_0_40px_rgba(0,0,0,0.1)]">
         <ZoomWindow
           strokes={strokes}
           setStrokes={setStrokes}

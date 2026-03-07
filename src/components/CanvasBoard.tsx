@@ -87,25 +87,36 @@ export const CanvasBoard = React.memo(function CanvasBoard({
   useEffect(() => {
     const canvas = backgroundCanvasRef.current;
     if (!canvas || windowSize.width === 0) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== windowSize.width * dpr || canvas.height !== windowSize.height * dpr) {
-      canvas.width = windowSize.width * dpr;
-      canvas.height = windowSize.height * dpr;
-      ctx.scale(dpr, dpr);
-    }
+    let animationFrameId: number;
 
-    ctx.clearRect(0, 0, windowSize.width, windowSize.height);
-    drawBackground(ctx, windowSize.width, windowSize.height, transform, background, pattern);
+    const render = (time: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== windowSize.width * dpr || canvas.height !== windowSize.height * dpr) {
+        canvas.width = windowSize.width * dpr;
+        canvas.height = windowSize.height * dpr;
+        ctx.scale(dpr, dpr);
+      }
+
+      ctx.clearRect(0, 0, windowSize.width, windowSize.height);
+      drawBackground(ctx, windowSize.width, windowSize.height, transform, background, pattern, time);
+
+      if (background === 'universe' || background === 'mosaic') {
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animationFrameId);
   }, [transform, background, pattern, windowSize]);
 
   // Static Render Loop (Completed Strokes)
   useEffect(() => {
     const canvas = staticCanvasRef.current;
     if (!canvas || windowSize.width === 0) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -133,7 +144,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
   useEffect(() => {
     const canvas = activeCanvasRef.current;
     if (!canvas || windowSize.width === 0) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let animationFrameId: number;
