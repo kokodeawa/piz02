@@ -399,7 +399,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-[100dvh] overflow-hidden bg-slate-50 relative font-sans flex flex-col landscape:flex-row pb-[env(safe-area-inset-bottom)]">
+    <div className="w-full h-[100dvh] overflow-hidden bg-slate-50 relative font-sans flex flex-col landscape:flex-row">
       <div className="flex-1 relative">
         <CanvasBoard
           strokes={strokes}
@@ -427,7 +427,7 @@ export default function App() {
         />
       </div>
 
-      <div className="fixed bottom-[35vh] landscape:bottom-4 landscape:left-4 landscape:right-auto landscape:w-auto landscape:max-w-[60vw] left-0 right-0 z-50">
+      <div className="fixed bottom-[40dvh] landscape:bottom-4 landscape:left-4 landscape:right-auto landscape:w-auto landscape:max-w-[60vw] left-0 right-0 z-50">
         <Toolbar
           tool={tool}
           setTool={setTool}

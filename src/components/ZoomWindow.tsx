@@ -407,8 +407,8 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
       className="w-full h-full bg-white border-t-4 landscape:border-t-0 landscape:border-l-4 border-indigo-500 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] landscape:shadow-[-10px_0_40px_rgba(0,0,0,0.1)] touch-none flex flex-col"
       style={{ willChange: 'transform' }}
     >
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2 pb-1 items-center">
           {[2, 3, 4].map(z => (
             <button 
               key={z} 

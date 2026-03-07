@@ -13,8 +13,8 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: null,
-        includeAssets: ['icon.svg'],
+        injectRegister: 'auto',
+        includeAssets: ['icon.svg', 'robots.txt'],
         manifest: {
           name: 'Pizarra Interactiva Pro',
           short_name: 'Pizarra',
