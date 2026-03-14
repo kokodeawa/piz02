@@ -16,6 +16,32 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ documents, onSelect, onCreate, onDelete, onRename }) => {
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editName, setEditName] = React.useState('');
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [isInstallable, setIsInstallable] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+    }
+    setDeferredPrompt(null);
+  };
   
   const exportToPDF = async (doc: CanvasDocument) => {
     const pdf = new jsPDF({
@@ -54,13 +80,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ documents, onSelect, onCre
             <h1 className="text-4xl font-bold text-slate-900 tracking-tight">Mis Pizarras</h1>
             <p className="text-slate-500 mt-2">Gestiona tus lienzos y dibujos</p>
           </div>
-          <button 
-            onClick={onCreate}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
-          >
-            <Plus size={20} />
-            Nuevo Lienzo
-          </button>
+          <div className="flex gap-3">
+            {isInstallable && (
+              <button 
+                onClick={handleInstallClick}
+                className="flex items-center gap-2 bg-white text-indigo-600 border-2 border-indigo-100 px-6 py-3 rounded-2xl font-semibold hover:bg-indigo-50 transition-all active:scale-95"
+              >
+                <Download size={20} />
+                Instalar App
+              </button>
+            )}
+            <button 
+              onClick={onCreate}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
+            >
+              <Plus size={20} />
+              Nuevo Lienzo
+            </button>
+          </div>
         </header>
 
         {documents.length === 0 ? (

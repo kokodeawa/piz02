@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Pizarra Interactiva Pro
 
-# Run and deploy your AI Studio app
+Esta aplicación es una pizarra interactiva avanzada diseñada para ser utilizada como una Web App (PWA) y desplegada en GitHub Pages.
 
-This contains everything you need to run your app locally.
+## Características
+- **PWA Ready**: Se puede instalar en dispositivos móviles y escritorio.
+- **GitHub Pages**: Configurada para despliegue automático mediante GitHub Actions.
+- **Soporte SPA**: Incluye scripts para manejar rutas en GitHub Pages sin errores 404.
 
-View your app in AI Studio: https://ai.studio/apps/1e9c09c2-638c-4d8e-b959-400b5a988b65
+## Despliegue en GitHub Pages
 
-## Run Locally
+1. Sube este código a un repositorio de GitHub.
+2. Ve a **Settings > Pages** en tu repositorio.
+3. En **Build and deployment > Source**, selecciona **GitHub Actions**.
+4. El archivo `.github/workflows/deploy.yml` se encargará de compilar y desplegar la aplicación automáticamente cada vez que hagas un push a la rama `main`.
 
-**Prerequisites:**  Node.js
+## Instalación como Web App
 
+Una vez desplegada, abre la URL en tu navegador:
+- En **Chrome/Edge (Escritorio)**: Aparecerá un icono de instalación en la barra de direcciones o un botón "Instalar App" en el Dashboard.
+- En **iOS (Safari)**: Pulsa el botón "Compartir" y selecciona "Añadir a la pantalla de inicio".
+- En **Android**: Aparecerá un aviso para añadir a la pantalla de inicio.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Configuración de API Key
+
+Para que el asistente de IA funcione, debes configurar la variable de entorno `GEMINI_API_KEY` en los **Secrets** de tu repositorio de GitHub si planeas usarlo en el build, o asegurarte de que esté disponible en el entorno de ejecución.
