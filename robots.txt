@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ssjbanghello2.github.io/pizarra-interactiva/sitemap.xml
