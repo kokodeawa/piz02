@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Stroke, ToolType, CanvasTransform, BackgroundType, PatternType, CanvasDocument } from './types';
 import { getStroke } from 'perfect-freehand';
+import { GoogleGenAI } from "@google/genai";
 import { CanvasBoard } from './components/CanvasBoard';
 import { Toolbar } from './components/Toolbar';
 import { ZoomWindow } from './components/ZoomWindow';
@@ -8,6 +9,8 @@ import { Dashboard } from './components/Dashboard';
 import { v4 as uuidv4 } from 'uuid';
 import { jsPDF } from 'jspdf';
 import { drawStroke, drawBackground } from './utils/canvas';
+import { renderLatexToDataUrl } from './utils/math';
+import { Sparkles, X, Loader2, Send } from 'lucide-react';
 
 export default function App() {
   const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
@@ -53,6 +56,92 @@ export default function App() {
   
   const [lupaPos, setLupaPos] = useState({ x: 0, y: 0, width: 400, height: 200, zoom: 2 });
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
+
+  // AI Assistant State
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [aiPrompt, setAIPrompt] = useState('');
+  const [isAILoading, setIsAILoading] = useState(false);
+  const [aiError, setAIError] = useState<string | null>(null);
+
+  const handleAIGenerate = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsAILoading(true);
+    setAIError(null);
+    console.log('Starting AI generation with prompt:', aiPrompt);
+    
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('La clave de API de Gemini no está configurada en el entorno.');
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      
+      // Add a manual timeout to the AI request
+      const generatePromise = ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Eres un profesor experto. Genera ejercicios educativos basados en este pedido: "${aiPrompt}". 
+        
+        REGLAS CRÍTICAS DE FORMATO:
+        1. Usa LaTeX para TODAS las expresiones matemáticas.
+        2. Para fracciones, usa SIEMPRE \\frac{numerador}{denominador}.
+        3. Para multiplicaciones usa \\times y para divisiones usa \\div o \\frac.
+        4. Si hay varios ejercicios, úsalos dentro de un entorno aligned para que queden uno debajo de otro.
+        5. Ejemplo de salida multilínea: "\\begin{aligned} 1) & \\frac{1}{2} + \\frac{3}{4} = \\\\ 2) & 5 \\times 4 = \\end{aligned}"
+        6. NO incluyas texto explicativo, SOLO el bloque de LaTeX.`,
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('La solicitud tardó demasiado tiempo (30s). Por favor, intenta de nuevo.')), 30000)
+      );
+
+      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
+      
+      console.log('AI Response received:', response);
+      
+      let latex = response.text;
+      if (latex) {
+        // Clean up markdown code blocks if present
+        latex = latex.replace(/```latex/g, '').replace(/```/g, '').trim();
+        console.log('Cleaned LaTeX:', latex);
+        
+        const textColor = (background === 'dark' || background === 'navy' || background === 'black' || background === 'gray' || background === 'universe' || background === 'mosaic') ? '#ffffff' : '#000000';
+        
+        const { dataUrl, width, height } = await renderLatexToDataUrl(latex, textColor);
+        console.log('Rendered LaTeX to DataURL');
+        
+        // Add text to the board at the center of the current view
+        const centerX = (boardSize.width / 2 - transform.x) / transform.scale;
+        const centerY = (boardSize.height / 2 - transform.y) / transform.scale;
+        
+        const newStroke: Stroke = {
+          id: uuidv4(),
+          points: [[centerX, centerY, 1]],
+          color: textColor,
+          size: size,
+          tool: 'pen',
+          text: latex,
+          imageData: dataUrl,
+          imageWidth: width,
+          imageHeight: height,
+          createdAt: Date.now()
+        };
+        
+        setStrokes(prev => [...prev, newStroke]);
+        setUndoStack(prev => [...prev, strokes]);
+        setRedoStack([]);
+        setIsAIModalOpen(false);
+        setAIPrompt('');
+      } else {
+        throw new Error('La IA no devolvió ningún contenido. Intenta con un pedido diferente.');
+      }
+    } catch (error) {
+      console.error('AI generation failed:', error);
+      setAIError(error instanceof Error ? error.message : 'Error desconocido al generar ejercicios.');
+    } finally {
+      setIsAILoading(false);
+    }
+  };
 
   const viewRef = useRef(view);
   useEffect(() => { viewRef.current = view; }, [view]);
@@ -228,9 +317,13 @@ export default function App() {
   // Save state before stroke
   const handleStrokeStart = useCallback(() => {
     if (tool === 'laser') return;
-    setUndoStack(prev => [...prev, strokes]);
+    // History is now saved in handleStrokeEnd and onHistorySave to prevent cancelled strokes from adding to history
+  }, [tool]);
+
+  const handleHistorySave = useCallback((oldStrokes: Stroke[]) => {
+    setUndoStack(prev => [...prev, oldStrokes]);
     setRedoStack([]);
-  }, [strokes, tool]);
+  }, []);
 
   const handleStrokeEnd = useCallback((stroke: Stroke) => {
     if (stroke) {
@@ -455,6 +548,7 @@ export default function App() {
           setTransform={setTransform}
           onStrokeStart={handleStrokeStart}
           onStrokeEnd={handleStrokeEnd}
+          onHistorySave={handleHistorySave}
           lupaActive={true}
           lupaPos={lupaPos}
           setLupaPos={setLupaPos}
@@ -488,6 +582,7 @@ export default function App() {
           onResetOrigin={handleResetOrigin}
           onCenterLupa={handleCenterLupa}
           onExit={handleExit}
+          onAIPrompt={() => setIsAIModalOpen(true)}
           canUndo={undoStack.length > 0}
           canRedo={redoStack.length > 0}
           isToolbarVisible={isToolbarVisible}
@@ -495,7 +590,7 @@ export default function App() {
         />
       </div>
 
-      <div className="z-40 flex flex-col h-[40dvh] landscape:h-full landscape:w-[35vw] border-t-4 landscape:border-t-0 landscape:border-l-4 border-indigo-500 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] landscape:shadow-[-10px_0_40px_rgba(0,0,0,0.1)]">
+      <div className="z-40 flex flex-col h-[40dvh] landscape:h-full landscape:w-[35vw] border-t border-slate-200 landscape:border-t-0 landscape:border-l border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] landscape:shadow-[-10px_0_40px_rgba(0,0,0,0.05)]">
         <ZoomWindow
           strokes={strokes}
           setStrokes={setStrokes}
@@ -532,14 +627,104 @@ export default function App() {
           onToggleLupaVisibility={handleToggleLupaVisibility}
           onStrokeStart={handleStrokeStart}
           onStrokeEnd={handleStrokeEnd}
+          onHistorySave={handleHistorySave}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onResetOrigin={handleResetOrigin}
           onCenterLupa={handleCenterLupa}
           onExit={handleExit}
+          onAIPrompt={() => setIsAIModalOpen(true)}
           onResize={handleZoomWindowResize}
         />
       </div>
+
+      {/* AI Assistant Modal */}
+      {isAIModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 border border-white/20">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-violet-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
+                  <Sparkles size={20} className="animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 leading-tight">IA Asistente</h3>
+                  <p className="text-[10px] uppercase tracking-wider font-semibold text-indigo-500/70">Generador de Contenido</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsAIModalOpen(false)}
+                className="p-2 rounded-xl hover:bg-white/80 text-slate-400 hover:text-slate-600 transition-all active:scale-95"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 flex flex-col gap-6">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-slate-700">¿Qué ejercicios necesitas?</p>
+                <p className="text-xs text-slate-400">
+                  Describe los temas o problemas que quieres que aparezcan en la pizarra.
+                </p>
+              </div>
+              
+              {aiError && (
+                <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs flex gap-3 animate-in slide-in-from-top-2">
+                  <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-red-400 mt-1" />
+                  <p><strong>Error:</strong> {aiError}</p>
+                </div>
+              )}
+              
+              <div className="relative group">
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAIPrompt(e.target.value)}
+                  placeholder="Ej: 5 sumas de fracciones heterogéneas..."
+                  className="w-full h-36 p-5 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 focus:ring-8 focus:ring-indigo-500/5 outline-none transition-all resize-none text-slate-700 text-sm leading-relaxed placeholder:text-slate-300"
+                  disabled={isAILoading}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      handleAIGenerate();
+                    }
+                  }}
+                />
+                <div className="absolute bottom-3 right-3 text-[10px] font-medium text-slate-300 group-focus-within:text-indigo-300 transition-colors">
+                  Ctrl + Enter para generar
+                </div>
+              </div>
+              
+              <button
+                onClick={handleAIGenerate}
+                disabled={isAILoading || !aiPrompt.trim()}
+                className={`
+                  w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all active:scale-[0.98]
+                  ${isAILoading || !aiPrompt.trim() 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-indigo-600 text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 hover:-translate-y-0.5'}
+                `}
+              >
+                {isAILoading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Generando ejercicios...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={18} />
+                    <span>Generar Ejercicios</span>
+                  </>
+                )}
+              </button>
+            </div>
+            
+            <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-center">
+              <p className="text-[10px] text-slate-400 text-center">
+                La IA puede cometer errores. Revisa los resultados antes de usarlos.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

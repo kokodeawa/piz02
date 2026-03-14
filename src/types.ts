@@ -13,6 +13,10 @@ export interface Stroke {
   opacity?: number;
   outline?: number[][]; // Cached outline for performance
   createdAt?: number;
+  text?: string;
+  imageData?: string;
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 export interface CanvasTransform {
@@ -21,7 +25,7 @@ export interface CanvasTransform {
   scale: number;
 }
 
-export type BackgroundType = 'blank' | 'dark' | 'pink' | 'yellow' | 'navy' | 'black' | 'gray' | 'universe' | 'mosaic' | 'lightgray' | 'midgray' | 'green';
+export type BackgroundType = 'blank' | 'dark' | 'pink' | 'yellow' | 'navy' | 'black' | 'gray' | 'universe' | 'mosaic' | 'bluemosaic' | 'lightgray' | 'midgray' | 'green';
 
 export interface CanvasDocument {
   id: string;

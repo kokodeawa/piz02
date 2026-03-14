@@ -24,6 +24,7 @@ interface CanvasBoardProps {
   setTransform: React.Dispatch<React.SetStateAction<CanvasTransform>>;
   onStrokeStart: () => void;
   onStrokeEnd: (stroke: Stroke) => void;
+  onHistorySave: (oldStrokes: Stroke[]) => void;
   lupaActive: boolean;
   lupaPos: { x: number; y: number; width: number; height: number; zoom: number };
   setLupaPos: React.Dispatch<React.SetStateAction<{ x: number; y: number; width: number; height: number; zoom: number }>>;
@@ -32,7 +33,7 @@ interface CanvasBoardProps {
 
 export const CanvasBoard = React.memo(function CanvasBoard({
   strokes, setStrokes, laserStrokes, setLaserStrokes, currentStrokeRef, tool, color, size, laserColor, laserSize, eraserSize, background, pattern,
-  lupaVisible, transform, setTransform, onStrokeStart, onStrokeEnd,
+  lupaVisible, transform, setTransform, onStrokeStart, onStrokeEnd, onHistorySave,
   lupaActive, lupaPos, setLupaPos, onResize
 }: CanvasBoardProps) {
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,7 +104,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
       ctx.clearRect(0, 0, windowSize.width, windowSize.height);
       drawBackground(ctx, windowSize.width, windowSize.height, transform, background, pattern, time);
 
-      if (background === 'universe' || background === 'mosaic') {
+      if (background === 'universe' || background === 'mosaic' || background === 'bluemosaic') {
         animationFrameId = requestAnimationFrame(render);
       }
     };
@@ -193,6 +194,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
   };
 
   const activePointers = useRef(new Set<number>());
+  const initialStrokesRef = useRef<Stroke[] | null>(null);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -207,6 +209,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
     const pos = getPointerPos(e);
 
     if (tool === 'eraser') {
+      initialStrokesRef.current = strokes;
       const eraserRadius = eraserSize / 2;
       setStrokes(prev => prev.filter(stroke => {
         return !stroke.points.some(p => {
@@ -262,6 +265,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     e.preventDefault();
+    if (activePointers.current.size === 0) return;
     if (activePointers.current.size > 1) return;
     
     if (isPanning && lastPan) {
@@ -322,12 +326,24 @@ export const CanvasBoard = React.memo(function CanvasBoard({
     setLastPan(null);
     setIsDraggingLupa(false);
 
+    if (tool === 'eraser') {
+      if (initialStrokesRef.current && initialStrokesRef.current.length !== strokes.length) {
+        onHistorySave(initialStrokesRef.current);
+      }
+      initialStrokesRef.current = null;
+      setIsDrawing(false);
+      return;
+    }
+
     if (isDrawing && currentStrokeRef.current) {
       setIsDrawing(false);
       onStrokeEnd(currentStrokeRef.current);
       currentStrokeRef.current = null;
     }
   };
+
+  const currentTransformRef = useRef(transform);
+  currentTransformRef.current = transform;
 
   // Pinch to zoom and two-finger pan
   useEffect(() => {
@@ -345,12 +361,12 @@ export const CanvasBoard = React.memo(function CanvasBoard({
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         initialPinchDistance = Math.hypot(dx, dy);
-        initialScale = transform.scale;
+        initialScale = currentTransformRef.current.scale;
         
         const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         initialPan = { x: cx, y: cy };
-        initialTransform = { ...transform };
+        initialTransform = { ...currentTransformRef.current };
       }
     };
 
@@ -377,11 +393,11 @@ export const CanvasBoard = React.memo(function CanvasBoard({
         const panX = cx - initialPan.x;
         const panY = cy - initialPan.y;
 
-        setTransform({
-          x: pointerX - targetX * newScale + panX,
-          y: pointerY - targetY * newScale + panY,
+        setTransform(prev => ({
+          x: initialTransform ? pointerX - targetX * newScale + panX : prev.x,
+          y: initialTransform ? pointerY - targetY * newScale + panY : prev.y,
           scale: newScale
-        });
+        }));
       }
     };
 
@@ -404,7 +420,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [transform, setTransform, tool]);
+  }, [setTransform, tool]);
 
   // Wheel event for desktop
   useEffect(() => {
@@ -413,19 +429,20 @@ export const CanvasBoard = React.memo(function CanvasBoard({
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+      const currentTransform = currentTransformRef.current;
       if (e.ctrlKey) {
         // Zoom
         const zoomSensitivity = 0.005;
         const delta = -e.deltaY * zoomSensitivity;
-        const newScale = Math.min(Math.max(0.1, transform.scale * Math.exp(delta)), 10);
+        const newScale = Math.min(Math.max(0.1, currentTransform.scale * Math.exp(delta)), 10);
         
         // Zoom around pointer
         const rect = container.getBoundingClientRect();
         const pointerX = e.clientX - rect.left;
         const pointerY = e.clientY - rect.top;
         
-        const targetX = (pointerX - transform.x) / transform.scale;
-        const targetY = (pointerY - transform.y) / transform.scale;
+        const targetX = (pointerX - currentTransform.x) / currentTransform.scale;
+        const targetY = (pointerY - currentTransform.y) / currentTransform.scale;
         
         setTransform({
           x: pointerX - targetX * newScale,
@@ -444,7 +461,7 @@ export const CanvasBoard = React.memo(function CanvasBoard({
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [transform, setTransform]);
+  }, [setTransform]);
 
   return (
     <div 

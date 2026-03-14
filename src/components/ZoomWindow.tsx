@@ -19,13 +19,14 @@ interface ZoomWindowProps extends ToolbarProps {
   onToggleLupaVisibility: () => void;
   onStrokeStart: () => void;
   onStrokeEnd: (stroke: Stroke) => void;
+  onHistorySave: (oldStrokes: Stroke[]) => void;
   onResize?: (width: number, height: number) => void;
 }
 
 export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps) {
   const {
     strokes, setStrokes, laserStrokes, setLaserStrokes, currentStrokeRef, tool, color, size,
-    lupaPos, setLupaPos, lupaVisible, onFindLupa, onToggleLupaVisibility, onStrokeStart, onStrokeEnd, onResize,
+    lupaPos, setLupaPos, lupaVisible, onFindLupa, onToggleLupaVisibility, onStrokeStart, onStrokeEnd, onHistorySave, onResize,
     // Toolbar props
     setTool, setColor, setSize, laserColor, setLaserColor, laserSize, setLaserSize,
     eraserSize, setEraserSize,
@@ -131,7 +132,7 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
       };
       drawBackground(ctx, windowSize.width, windowSize.height, zoomTransform, background, pattern, time);
 
-      if (background === 'universe' || background === 'mosaic') {
+      if (background === 'universe' || background === 'mosaic' || background === 'bluemosaic') {
         animationFrameId = requestAnimationFrame(render);
       }
     };
@@ -211,13 +212,18 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     return () => cancelAnimationFrame(animationFrameId);
   }, [strokes, laserStrokes, displayLupaPos, windowSize]);
 
-  // Pinch to zoom for magnifier
+  const currentLupaPosRef = useRef(lupaPos);
+  currentLupaPosRef.current = lupaPos;
+
+  // Pinch to zoom and pan for magnifier
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     let initialPinchDistance: number | null = null;
     let initialZoom: number = 1;
+    let initialPan: { x: number; y: number } | null = null;
+    let initialLupaPos: { x: number; y: number } | null = null;
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
@@ -225,23 +231,44 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         initialPinchDistance = Math.hypot(dx, dy);
-        initialZoom = lupaPos.zoom;
+        initialZoom = currentLupaPosRef.current.zoom;
+        
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        initialPan = { x: cx, y: cy };
+        initialLupaPos = { x: currentLupaPosRef.current.x, y: currentLupaPosRef.current.y };
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && initialPinchDistance) {
+      if (e.touches.length === 2 && initialPinchDistance && initialPan && initialLupaPos) {
         e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const distance = Math.hypot(dx, dy);
         
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        
         const scaleRatio = distance / initialPinchDistance;
         const newZoom = Math.min(Math.max(1, initialZoom * scaleRatio), 8);
 
+        // Calculate pan
+        const currentLupaPos = currentLupaPosRef.current;
+        const targetWidth = currentLupaPos.width / currentLupaPos.zoom;
+        const targetHeight = currentLupaPos.height / currentLupaPos.zoom;
+        const scaleX = windowSize.width / targetWidth;
+        const scaleY = windowSize.height / targetHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        const panX = cx - initialPan.x;
+        const panY = cy - initialPan.y;
+
         setLupaPos(prev => ({
           ...prev,
-          zoom: newZoom
+          zoom: newZoom,
+          x: initialLupaPos ? initialLupaPos.x - panX / scale : prev.x,
+          y: initialLupaPos ? initialLupaPos.y - panY / scale : prev.y
         }));
       }
     };
@@ -249,6 +276,33 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     const handleTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) {
         initialPinchDistance = null;
+        initialPan = null;
+        initialLupaPos = null;
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const currentLupaPos = currentLupaPosRef.current;
+      if (e.ctrlKey) {
+        // Zoom
+        const zoomSensitivity = 0.005;
+        const delta = -e.deltaY * zoomSensitivity;
+        const newZoom = Math.min(Math.max(1, currentLupaPos.zoom * Math.exp(delta)), 8);
+        setLupaPos(prev => ({ ...prev, zoom: newZoom }));
+      } else {
+        // Pan
+        const targetWidth = currentLupaPos.width / currentLupaPos.zoom;
+        const targetHeight = currentLupaPos.height / currentLupaPos.zoom;
+        const scaleX = windowSize.width / targetWidth;
+        const scaleY = windowSize.height / targetHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        setLupaPos(prev => ({
+          ...prev,
+          x: prev.x + e.deltaX / scale,
+          y: prev.y + e.deltaY / scale
+        }));
       }
     };
 
@@ -256,14 +310,16 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     container.addEventListener('touchmove', handleTouchMove, { passive: false });
     container.addEventListener('touchend', handleTouchEnd);
     container.addEventListener('touchcancel', handleTouchEnd);
+    container.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       container.removeEventListener('touchstart', handleTouchStart);
       container.removeEventListener('touchmove', handleTouchMove);
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('touchcancel', handleTouchEnd);
+      container.removeEventListener('wheel', handleWheel);
     };
-  }, [lupaPos.zoom, setLupaPos, tool]);
+  }, [windowSize, setLupaPos, tool]);
 
   const getPointerPos = (e: React.PointerEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -289,6 +345,7 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
   };
 
   const activePointers = useRef(new Set<number>());
+  const initialStrokesRef = useRef<Stroke[] | null>(null);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -302,6 +359,7 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     const pos = getPointerPos(e);
 
     if (tool === 'eraser') {
+      initialStrokesRef.current = strokes;
       const eraserRadius = eraserSize / 2;
       setStrokes(prev => prev.filter(stroke => {
         return !stroke.points.some(p => {
@@ -344,6 +402,7 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
 
   const handlePointerMove = (e: React.PointerEvent) => {
     e.preventDefault();
+    if (activePointers.current.size === 0) return;
     if (activePointers.current.size > 1) return;
 
     const pos = getPointerPos(e);
@@ -407,6 +466,15 @@ export const ZoomWindow = React.memo(function ZoomWindow(props: ZoomWindowProps)
     if (isPanning) {
       setIsPanning(false);
       setLastPan(null);
+      return;
+    }
+
+    if (tool === 'eraser') {
+      if (initialStrokesRef.current && initialStrokesRef.current.length !== strokes.length) {
+        onHistorySave(initialStrokesRef.current);
+      }
+      initialStrokesRef.current = null;
+      setIsDrawing(false);
       return;
     }
 

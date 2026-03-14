@@ -281,6 +281,7 @@ export const Toolbar = React.memo(function Toolbar({
                     <BgButton label="Negro" icon={<div className="w-4 h-4 bg-black rounded-sm" />} active={background === 'black'} onClick={() => { setBackground('black'); }} />
                     <BgButton label="Universo" icon={<Sparkles size={18} className="text-indigo-400" />} active={background === 'universe'} onClick={() => { setBackground('universe'); }} />
                     <BgButton label="Mosaico" icon={<LayoutGrid size={18} className="text-emerald-400" />} active={background === 'mosaic'} onClick={() => { setBackground('mosaic'); }} />
+                    <BgButton label="Mosaico Azul" icon={<LayoutGrid size={18} className="text-blue-400" />} active={background === 'bluemosaic'} onClick={() => { setBackground('bluemosaic'); }} />
                   </div>
                 </div>
               </div>
